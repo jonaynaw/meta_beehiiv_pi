@@ -1,0 +1,5 @@
+azure-functions
+psycopg2-binary
+python-dotenv
+facebook-business
+requests
