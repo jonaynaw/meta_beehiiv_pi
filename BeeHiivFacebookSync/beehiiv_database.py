@@ -251,120 +251,48 @@ def fetch_data_from_beehiiv_api():
         "Accept": "application/json",
         "Authorization": os.environ["BEEHIIV_API_KEY"],
     }
-
-    pub_params = {
-        "direction": "desc",
-        "expand[]": "stats",
-        "limit": "100",
-        "order_by": "publish_date",
-        "status": "confirmed"
-    }
-
-    segment_params = {
-        "limit": "100",
-    }
-
-    def get_pubs_info():
-        names = {}
+    
+    try:
+        # Obtener lista de publicaciones
         url = "https://api.beehiiv.com/v2/publications"
-        response = requests.get(url, headers=api_headers, params={ "expand[]": "stats", "limit": "100", "order_by": "name" })
-        response = response.json()
-        for i in response['data']:
-            names.update({ 
-                i['name']: { 
-                    'id': i['id'],
-                    'name': i['name'],
-                    'organization_name': i['organization_name'],
-                    'publication_stats': {
-                        'active_subscriptions': i['stats']['active_subscriptions'],
-                        'active_premium_subscriptions': i['stats']['active_premium_subscriptions'],
-                        'active_free_subscriptions': i['stats']['active_free_subscriptions'],
-                        'average_open_rate': i['stats']['average_open_rate'],
-                        'average_click_rate': i['stats']['average_click_rate'],
-                        'total_sent': i['stats']['total_sent'],
-                        'total_unique_opened': i['stats']['total_unique_opened'],
-                        'total_clicked': i['stats']['total_clicked']
-                    }
-                }
-            })
-        return names
-
-    def get_posts_info(pub_id, top_date, pub_name):
-        posts_responses = []
-        for i in range(1, 11):
-            break_for = False
-            pub_params["page"] = i
-            posts_temp_response = requests.get(f"https://api.beehiiv.com/v2/publications/{pub_id}/posts", headers=api_headers, params=pub_params)
-            posts_temp_response = posts_temp_response.json()
-            for element in posts_temp_response['data']:
-                post_data = {}
-                publish_date = datetime.fromtimestamp(element['publish_date'])
-                if publish_date > top_date:
-                    post_data['publication_id'] = pub_id
-                    post_data['publication_name'] = pub_name
-                    post_data['publish_date'] = publish_date.strftime('%Y-%m-%d')
-                    post_data['post_id'] = element['id']
-                    post_data['delivered'] = element['stats']['email']['recipients']
-                    post_data['clicks'] = element['stats']['email']['clicks']
-                    post_data['unique_clicks'] = element['stats']['email']['unique_clicks']
-                    post_data['click_rate'] = element['stats']['email']['click_rate']
-                    post_data['opens'] = element['stats']['email']['opens']
-                    post_data['unique_opens'] = element['stats']['email']['unique_opens']
-                    post_data['open_rate'] = element['stats']['email']['open_rate']
-                    post_data['unsubscribes'] = element['stats']['email']['unsubscribes']
-                    post_data['spam_reports'] = element['stats']['email']['spam_reports']
-                    post_data['urls'] = {
-                        n: {
-                            'post_id': element['id'],
-                            'publication_id': pub_id,
-                            'url': url['url'],
-                            'url_clicks': url['total_clicks'],
-                            'url_unique_clicks': url['total_unique_clicks'],
-                            'url_click_through_rate': url['total_click_through_rate']
-                        } for n, url in enumerate(element['stats']['clicks'])
-                    }
-                    posts_responses.append(post_data)
-                else:
-                    break_for = True
-                    break
-            if break_for:
-                break
-        return posts_responses
-
-    def get_segments_info(pub_id, pub_name):
-        segments_responses = []
-        for i in range(1, 11):
-            segment_params["page"] = i
-            segments_temp_response = requests.get(f"https://api.beehiiv.com/v2/publications/{pub_id}/segments", headers=api_headers, params=segment_params)
-            segments_temp_response = segments_temp_response.json()
-            segments_temp_response['data'] = [element for element in segments_temp_response['data'] if element['status'] == 'completed']
-            for element in segments_temp_response['data']:
-                segment_data = {}
-                segment_data['publication_id'] = pub_id
-                segment_data['publication_name'] = pub_name
-                segment_data['segment_id'] = element['id']
-                segment_data['segment_name'] = element['name']
-                segment_data['segment_type'] = 'Dinámico' if element['type'] == 'dynamic' else 'Estático' if element['type'] == 'static' else 'Manual'
-                segment_data['last_calculated'] = datetime.fromtimestamp(element['last_calculated']).strftime('%Y-%m-%d')
-                segment_data['total_results'] = element['total_results']
-                segment_data['status'] = 'Completado'
-                segments_responses.append(segment_data)
-        return segments_responses
-
-    def add_pubs_info(names, top_date):
-        for key, value in names.items():
-            posts_responses = get_posts_info(value['id'], top_date, key)
-            segments_responses = get_segments_info(value['id'], key)
-            if posts_responses:
-                names[key]['publication_posts'] = posts_responses
-            if segments_responses:
-                names[key]['publication_segments'] = segments_responses
-        return names
-
-    top_date = datetime.now().replace(microsecond=0) - timedelta(days=7)
-    names = get_pubs_info()
-    fixed_data = add_pubs_info(names, top_date)
-    return fixed_data
+        response = requests.get(url, headers=api_headers)
+        response.raise_for_status()
+        publications = response.json()
+        
+        publications_data = {}
+        
+        # Procesar cada publicación
+        for pub in publications['data']:
+            pub_id = pub['id']
+            
+            # Obtener estadísticas de la publicación
+            stats_url = f"{url}/{pub_id}/stats"
+            stats_response = requests.get(stats_url, headers=api_headers)
+            stats_response.raise_for_status()
+            stats = stats_response.json().get('data', {})
+            
+            # Estructurar datos según el esquema de la tabla
+            publications_data[pub_id] = {
+                'publication_id': pub_id,
+                'publication_name': pub['name'],
+                'organization_name': pub['organization_name'],
+                'active_subscriptions': stats.get('active_subscriptions', 0),
+                'active_premium_subscriptions': stats.get('active_premium_subscriptions', 0),
+                'active_free_subscriptions': stats.get('active_free_subscriptions', 0),
+                'average_open_rate': stats.get('average_open_rate', 0.0),
+                'average_click_rate': stats.get('average_click_rate', 0.0),
+                'total_sent': stats.get('total_sent', 0),
+                'total_unique_opened': stats.get('total_unique_opened', 0),
+                'total_clicked': stats.get('total_clicked', 0)
+            }
+            
+            logging.info(f"Processed publication: {pub['name']}")
+            
+        return publications_data
+        
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Beehiiv API Error: {str(e)}")
+        raise
 
 def create_db_rows(beehiiv_info, facebook_info=None):
     rows = {
@@ -419,14 +347,14 @@ def create_db_rows(beehiiv_info, facebook_info=None):
             nls['id'], 
             nls['name'], 
             nls['organization_name'],
-            nls['publication_stats']['active_subscriptions'], 
-            nls['publication_stats']['active_premium_subscriptions'],
-            nls['publication_stats']['active_free_subscriptions'], 
-            nls['publication_stats']['average_open_rate'],
-            nls['publication_stats']['average_click_rate'], 
-            nls['publication_stats']['total_sent'],
-            nls['publication_stats']['total_unique_opened'], 
-            nls['publication_stats']['total_clicked']
+            nls['active_subscriptions'], 
+            nls['active_premium_subscriptions'],
+            nls['active_free_subscriptions'], 
+            nls['average_open_rate'],
+            nls['average_click_rate'], 
+            nls['total_sent'],
+            nls['total_unique_opened'], 
+            nls['total_clicked']
         ))
 
         if 'publication_segments' in nls:
