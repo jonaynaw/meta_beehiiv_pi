@@ -366,7 +366,7 @@ def fetch_data_from_beehiiv_api():
     fixed_data = add_pubs_info(names, top_date)
     return fixed_data
 
-def create_db_rows(beehiiv_info, facebook_info):
+def create_db_rows(beehiiv_info, facebook_info=None):
     rows = {
         'newsletter_performance_table': {
             'columns': "(post_id, publication_id, publication_name, publish_date, delivered, clicks, unique_clicks, click_rate, opens, unique_opens, open_rate, unsubscribes, spam_reports)",
@@ -570,8 +570,7 @@ def create_db_rows(beehiiv_info, facebook_info):
                                     ad_set['status'],
                                     campaign['objective'],
                                     float(ad_set['bid_amount']) if 'bid_amount' in ad_set else 0,
-                                    ad_set['bid_strategy'] if 'bid_
-                                                                        ad_set['bid_strategy'] if 'bid_strategy' in ad_set else None,
+                                    ad_set['bid_strategy'] if 'bid_strategy' in ad_set else None,
                                     ad_set['billing_event'] if 'billing_event' in ad_set else None,
                                     float(ad_set['daily_budget']) if 'daily_budget' in ad_set else float(ad_set['lifetime_budget']) if 'lifetime_budget' in ad_set else 0,
                                     ad_set['targeting']['age_min'] if 'targeting' in ad_set and 'age_min' in ad_set['targeting'] else None,
